@@ -1,0 +1,126 @@
+generator client {
+ provider = "prisma-client-js"
+}
+datasource db {
+ provider = "postgresql"
+ url = env("DATABASE_URL")
+}
+
+enum Role {
+ ADMIN
+ CUSTOMER
+}
+enum OrderStatus {
+ PENDING
+ CONFIRMED
+ PROCESSING
+ SHIPPED
+ DELIVERED
+ CANCELLED
+}
+enum PaymentStatus {
+ PENDING
+ PAID
+ FAILED
+ EXPIRED
+}
+model User {
+ id String @id @default(cuid())
+ name String
+ email String @unique
+ passwordHash String
+ role Role @default(CUSTOMER)
+ sessionVersion Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ cart Cart?
+ wishlist Wishlist[]
+ orders Order[]
+}
+model Category {
+ id String @id @default(cuid())
+ name String
+ slug String @unique
+ products Product[]
+}
+model Product {
+ id String @id @default(cuid())
+ name String
+ description String
+ price Int
+ stock Int
+ categoryId String
+ category Category @relation(fields:[categoryId],references:[id])
+ image String @default("package")
+ active Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ cartItems CartItem[]
+ orderItems OrderItem[]
+ wishlist Wishlist[]
+ @@index([categoryId,active])
+}
+model Cart {
+ id String @id @default(cuid())
+ userId String @unique
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ items CartItem[]
+}
+model CartItem {
+ id String @id @default(cuid())
+ cartId String
+ cart Cart @relation(fields:[cartId],references:[id],onDelete:Cascade)
+ productId String
+ product Product @relation(fields:[productId],references:[id])
+ quantity Int
+ @@unique([cartId,productId])
+}
+model Wishlist {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ productId String
+ product Product @relation(fields:[productId],references:[id])
+ @@unique([userId,productId])
+}
+model Order {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields:[userId],references:[id])
+ total Int
+ status OrderStatus @default(PENDING)
+ paymentStatus PaymentStatus @default(PENDING)
+ shippingAddress Json
+ idempotencyKey String
+ expiresAt DateTime
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ items OrderItem[]
+ payment Payment?
+ @@unique([userId,idempotencyKey])
+ @@index([status,expiresAt])
+}
+model OrderItem {
+ id String @id @default(cuid())
+ orderId String
+ order Order @relation(fields:[orderId],references:[id],onDelete:Cascade)
+ productId String
+ product Product @relation(fields:[productId],references:[id])
+ productName String
+ quantity Int
+ priceAtPurchase Int
+}
+model Payment {
+ id String @id @default(cuid())
+ orderId String @unique
+ order Order @relation(fields:[orderId],references:[id])
+ provider String
+ providerPaymentId String? @unique
+ amount Int
+ status PaymentStatus @default(PENDING)
+ createdAt DateTime @default(now())
+}
+model WebhookEvent {
+ id String @id
+ createdAt DateTime @default(now())
+}
